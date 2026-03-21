@@ -17,7 +17,7 @@ const Dashboard = () => {
     setError('');
     try {
       const token = JSON.parse(localStorage.getItem('user')).token;
-      const { data } = await axios.post('http://localhost:5000/api/session/create', {}, {
+      const { data } = await axios.post('https://connecting-8kyk.onrender.com/api/session/create', {}, {
         headers: { Authorization: `Bearer ${token}` }
       });
       navigate(`/room/${data.code}`);
@@ -40,7 +40,7 @@ const Dashboard = () => {
     
     try {
       const token = JSON.parse(localStorage.getItem('user')).token;
-      await axios.post('http://localhost:5000/api/session/join', { code: joinCode }, {
+      await axios.post('https://connecting-8kyk.onrender.com/api/session/join', { code: joinCode }, {
         headers: { Authorization: `Bearer ${token}` }
       });
       navigate(`/room/${joinCode}`);

@@ -19,14 +19,14 @@ export const AuthProvider = ({ children }) => {
   }, []);
 
   const login = async (email, password) => {
-    const { data } = await axios.post('http://localhost:5000/api/auth/login', { email, password });
+    const { data } = await axios.post('https://connecting-8kyk.onrender.com/api/auth/login', { email, password });
     localStorage.setItem('user', JSON.stringify(data));
     setUser(data);
     return data;
   };
 
   const register = async (username, email, password) => {
-    const { data } = await axios.post('http://localhost:5000/api/auth/register', { username, email, password });
+    const { data } = await axios.post('https://connecting-8kyk.onrender.com/api/auth/register', { username, email, password });
     localStorage.setItem('user', JSON.stringify(data));
     setUser(data);
     return data;

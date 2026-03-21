@@ -17,7 +17,11 @@ const server = http.createServer(app);
 connectDB();
 
 // Middleware
-app.use(cors());
+app.use(cors({
+  origin: "https://connecting31.vercel.app/",
+  methods: ["GET", "POST"],
+  credentials: true
+}));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
@@ -29,8 +33,8 @@ app.use('/api/upload', uploadRoutes);
 // Socket.io setup
 const io = new Server(server, {
   cors: {
-    origin: '*',
-    methods: ['GET', 'POST']
+    origin: "https://connecting31.vercel.app/",
+    methods: ["GET", "POST"]
   }
 });
 
