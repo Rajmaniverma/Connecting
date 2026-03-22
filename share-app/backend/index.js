@@ -18,7 +18,7 @@ connectDB();
 
 // Middleware
 app.use(cors({
-  origin: "https://connecting31.vercel.app/",
+  origin: "https://connecting31.vercel.app",
   methods: ["GET", "POST"],
   credentials: true
 }));
@@ -33,7 +33,7 @@ app.use('/api/upload', uploadRoutes);
 // Socket.io setup
 const io = new Server(server, {
   cors: {
-    origin: "https://connecting31.vercel.app/",
+    origin: "https://connecting31.vercel.app",
     methods: ["GET", "POST"]
   }
 });
