@@ -3,18 +3,11 @@ import http from 'http';
 import { Server } from 'socket.io';
 import cors from 'cors';
 import dotenv from 'dotenv';
-import connectDB from './db.js';
-import authRoutes from './routes/auth.js';
-import sessionRoutes from './routes/session.js';
-import uploadRoutes from './routes/upload.js';
 
 dotenv.config();
 
 const app = express();
 const server = http.createServer(app);
-
-// Connect to MongoDB
-connectDB();
 
 // Middleware
 app.use(cors({
@@ -25,32 +18,28 @@ app.use(cors({
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-// Routes API
-app.use('/api/auth', authRoutes);
-app.use('/api/session', sessionRoutes);
-app.use('/api/upload', uploadRoutes);
-
 // Socket.io setup
 const io = new Server(server, {
   cors: {
     origin: "https://connecting31.vercel.app",
     methods: ["GET", "POST"]
-  }
+  },
+  maxHttpBufferSize: 1e8 // Increase limit to 100MB for sharing large base64 file payloads
 });
 
 io.on('connection', (socket) => {
   console.log('A user connected:', socket.id);
 
   // Join a specific room based on the 12-digit code
-  socket.on('join_room', ({ code }) => {
-    socket.join(code);
-    console.log(`User ${socket.id} joined room ${code}`);
-    socket.to(code).emit('user_joined', { userId: socket.id });
+  socket.on('join_room', (data) => {
+    socket.join(data.code);
+    console.log(`User ${data.username} (${socket.id}) joined room ${data.code}`);
+    socket.to(data.code).emit('user_joined', data);
   });
 
   // Handle messages
   socket.on('send_message', (data) => {
-    // data contains room code, message content, etc.
+    // Broadcast message / file data to the room
     io.to(data.code).emit('receive_message', data);
   });
 
@@ -66,7 +55,7 @@ io.on('connection', (socket) => {
 
 // Basic Route
 app.get('/', (req, res) => {
-  res.send('API is running...');
+  res.send('API is running. WebSocket server is active.');
 });
 
 const PORT = process.env.PORT || 5000;

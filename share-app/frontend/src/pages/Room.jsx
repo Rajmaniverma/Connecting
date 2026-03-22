@@ -3,7 +3,6 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { useDropzone } from 'react-dropzone';
 import { useSocket } from '../context/SocketContext';
 import { useAuth } from '../context/AuthContext';
-import axios from 'axios';
 import { Send, File, Download, X, Copy, Check } from 'lucide-react';
 import clsx from 'clsx';
 
@@ -29,9 +28,19 @@ const Room = () => {
     // Join room
     socket.emit('join_room', { code, userId: user._id, username: user.username });
 
+    // Load local messages
+    const localMsgs = localStorage.getItem(`messages_${code}`);
+    if (localMsgs) {
+      try { setMessages(JSON.parse(localMsgs)); } catch(e) {}
+    }
+
     // Listen for messages
     const handleReceiveMessage = (data) => {
-      setMessages((prev) => [...prev, data]);
+      setMessages((prev) => {
+        const newMsgs = [...prev, data];
+        localStorage.setItem(`messages_${code}`, JSON.stringify(newMsgs));
+        return newMsgs;
+      });
     };
 
     // Listen for typing
@@ -81,7 +90,11 @@ const Room = () => {
     };
 
     socket.emit('send_message', messageData);
-    setMessages((prev) => [...prev, messageData]);
+    setMessages((prev) => {
+      const newMsgs = [...prev, messageData];
+      localStorage.setItem(`messages_${code}`, JSON.stringify(newMsgs));
+      return newMsgs;
+    });
     setInputText('');
     
     // Clear typing
@@ -104,53 +117,66 @@ const Room = () => {
   };
 
   // Setup Dropzone
-  const onDrop = useCallback(async (acceptedFiles) => {
+  const onDrop = useCallback((acceptedFiles) => {
     if (acceptedFiles.length === 0) return;
     
     const file = acceptedFiles[0];
-    const formData = new FormData();
-    formData.append('file', file);
-    formData.append('sessionCode', code);
+    
+    // Check if file is too large for websocket
+    if (file.size > 50 * 1024 * 1024) {
+      alert('File is too large! Maximum size is 50MB for real-time WebSocket transfer.');
+      return;
+    }
 
     setIsUploading(true);
-    setUploadProgress(0);
+    setUploadProgress(10); // Start progress
 
-    try {
-        const token = JSON.parse(localStorage.getItem('user')).token;
-        const res = await axios.post('https://connecting-8kyk.onrender.com/api/upload', formData, {
-            headers: { 
-                'Content-Type': 'multipart/form-data',
-                Authorization: `Bearer ${token}`
-            },
-            onUploadProgress: (progressEvent) => {
-                const percentCompleted = Math.round((progressEvent.loaded * 100) / progressEvent.total);
-                setUploadProgress(percentCompleted);
-            }
-        });
+    const reader = new FileReader();
+    reader.onload = (e) => {
+        setUploadProgress(50); // Reading done
+        try {
+            const fileData = e.target.result;
+            
+            const fileMessage = {
+                code,
+                senderId: user._id,
+                senderName: user.username,
+                isFile: true,
+                fileId: Date.now().toString(), // local unique ID
+                fileName: file.name,
+                fileSize: file.size,
+                fileType: file.type,
+                fileData: fileData, // The base64 string
+                timestamp: new Date().toISOString(),
+            };
 
-        // Broadcast file message via socket
-        const fileMessage = {
-            code,
-            senderId: user._id,
-            senderName: user.username,
-            isFile: true,
-            fileId: res.data.file.id,
-            fileName: res.data.file.originalname,
-            fileSize: res.data.file.size,
-            fileType: res.data.file.mimetype,
-            timestamp: new Date().toISOString(),
-        };
+            setUploadProgress(80); // Processing done, emitting
 
-        socket.emit('send_message', fileMessage);
-        setMessages((prev) => [...prev, fileMessage]);
-
-    } catch (error) {
-        console.error('File upload failed', error);
-        alert('File upload failed');
-    } finally {
+            socket.emit('send_message', fileMessage);
+            setMessages((prev) => {
+                const newMsgs = [...prev, fileMessage];
+                localStorage.setItem(`messages_${code}`, JSON.stringify(newMsgs));
+                return newMsgs;
+            });
+            setUploadProgress(100);
+        } catch (error) {
+            console.error('File sharing failed', error);
+            alert('File sharing failed');
+        } finally {
+            setTimeout(() => {
+                setIsUploading(false);
+                setUploadProgress(0);
+            }, 500);
+        }
+    };
+    
+    reader.onerror = () => {
+        alert('Failed to read file');
         setIsUploading(false);
         setUploadProgress(0);
-    }
+    };
+    
+    reader.readAsDataURL(file);
   }, [code, socket, user]);
 
   const { getRootProps, getInputProps, isDragActive } = useDropzone({ 
@@ -159,18 +185,15 @@ const Room = () => {
     noKeyboard: true 
   });
 
-  const handleDownload = async (fileId, fileName) => {
+  const handleDownload = (fileData, fileName) => {
     try {
-        const token = JSON.parse(localStorage.getItem('user')).token;
-        const res = await axios.get(`https://connecting-8kyk.onrender.com/api/upload/download/${fileId}`, {
-            responseType: 'blob',
-            headers: { Authorization: `Bearer ${token}` }
-        });
-        
-        const url = window.URL.createObjectURL(new Blob([res.data]));
+        if (!fileData) {
+            alert('File data is not available.');
+            return;
+        }
         const link = document.createElement('a');
-        link.href = url;
-        link.setAttribute('download', fileName);
+        link.href = fileData;
+        link.download = fileName;
         document.body.appendChild(link);
         link.click();
         link.remove();
@@ -253,7 +276,7 @@ const Room = () => {
                             msg.isFile ? "p-0 overflow-hidden" : ""
                         )}>
                             {msg.isFile ? (
-                                <div className="bg-gray-50 border border-gray-200 w-64 cursor-pointer hover:bg-gray-100 group transition-colors" onClick={() => handleDownload(msg.fileId, msg.fileName)}>
+                                <div className="bg-gray-50 border border-gray-200 w-64 cursor-pointer hover:bg-gray-100 group transition-colors" onClick={() => handleDownload(msg.fileData, msg.fileName)}>
                                     <div className="p-4 flex items-start gap-4">
                                         <div className="bg-primary-100 p-2 rounded text-primary-600">
                                             <File size={24} />

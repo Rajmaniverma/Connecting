@@ -1,6 +1,5 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import axios from 'axios';
 import { useAuth } from '../context/AuthContext';
 import { KeyRound, Plus, LogIn, ArrowRight } from 'lucide-react';
 
@@ -16,13 +15,19 @@ const Dashboard = () => {
     setIsLoading(true);
     setError('');
     try {
-      const token = JSON.parse(localStorage.getItem('user')).token;
-      const { data } = await axios.post('https://connecting-8kyk.onrender.com/api/session/create', {}, {
-        headers: { Authorization: `Bearer ${token}` }
-      });
-      navigate(`/room/${data.code}`);
+      // Generate a random 12-digit code locally
+      const generateCode = () => {
+        return Array.from({length: 12}, () => Math.floor(Math.random() * 10)).join('');
+      };
+      
+      const code = generateCode();
+      
+      // Simulate slight network delay for UX
+      await new Promise(r => setTimeout(r, 600));
+      
+      navigate(`/room/${code}`);
     } catch (err) {
-      setError(err.response?.data?.message || 'Failed to create room.');
+      setError('Failed to create room.');
     } finally {
       setIsLoading(false);
     }
@@ -39,13 +44,11 @@ const Dashboard = () => {
     setError('');
     
     try {
-      const token = JSON.parse(localStorage.getItem('user')).token;
-      await axios.post('https://connecting-8kyk.onrender.com/api/session/join', { code: joinCode }, {
-        headers: { Authorization: `Bearer ${token}` }
-      });
+      // Direct navigation to room without backend validation
+      await new Promise(r => setTimeout(r, 400));
       navigate(`/room/${joinCode}`);
     } catch (err) {
-      setError(err.response?.data?.message || 'Failed to join room. Verify the code.');
+      setError('Failed to join room. Verify the code.');
     } finally {
       setIsLoading(false);
     }
